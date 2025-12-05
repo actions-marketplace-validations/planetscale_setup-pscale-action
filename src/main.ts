@@ -9,9 +9,15 @@ const darwinPackageUrl =
 const windowsPackageUrl =
   'https://github.com/planetscale/cli/releases/download/{{VERSION}}/pscale_{{VERSION2}}_windows_amd64.zip'
 
-async function getLatestReleaseVersion(): Promise<string> {
+async function getLatestReleaseVersion(githubToken?: string): Promise<string> {
   const apiUrl = `https://api.github.com/repos/planetscale/cli/releases/latest`;
-  const response = await axios.get(apiUrl);
+  const headers: Record<string, string> = {};
+
+  if (githubToken) {
+    headers['Authorization'] = `Bearer ${githubToken}`;
+  }
+
+  const response = await axios.get(apiUrl, { headers });
   return response.data.tag_name;
 }
 
@@ -23,13 +29,14 @@ function validateVersion(version: string): void {
 }
 
 async function run(): Promise<void> {
+  let packageUrl = '';
   try {
     const version = core.getInput('version') || 'latest';
+    const githubToken = core.getInput('github-token') || process.env.GITHUB_TOKEN;
+
     validateVersion(version);
 
     core.debug(`requested version: ${version}`);
-
-    let packageUrl = '';
     if (process.platform === 'win32') {
       packageUrl = windowsPackageUrl;
     } else if (process.platform === 'darwin') {
@@ -40,8 +47,8 @@ async function run(): Promise<void> {
 
     let latestVersion = '';
     if (version === 'latest') {
-      latestVersion = await getLatestReleaseVersion();
-      core.debug(`latest version: ${version}`);
+      latestVersion = await getLatestReleaseVersion(githubToken);
+      core.debug(`latest version: ${latestVersion}`);
       packageUrl = packageUrl
         .replace(/{{VERSION}}/g, latestVersion)
         .replace(/{{VERSION2}}/g, latestVersion.replace(/^v/, ''));
@@ -53,7 +60,8 @@ async function run(): Promise<void> {
 
     core.debug(`package url: ${packageUrl}`);
 
-    const downloadedPackagePath = await tc.downloadTool(packageUrl);
+    const auth = githubToken ? `Bearer ${githubToken}` : undefined;
+    const downloadedPackagePath = await tc.downloadTool(packageUrl, undefined, auth);
     const extractedFolder = await tc.extractTar(downloadedPackagePath, 'tools/pscale');
 
     const packagePath = await tc.cacheDir(extractedFolder, 'pscale', version === 'latest' ? latestVersion : version);
@@ -61,7 +69,7 @@ async function run(): Promise<void> {
     core.addPath(packagePath);
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(error.message);
+      core.setFailed(`pscale was unable to be installed from GitHub. URL: ${packageUrl}. Error: ${error.message}`);
     }
   }
 }

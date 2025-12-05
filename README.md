@@ -23,8 +23,11 @@ Setting the `version` is optional. When omitted, the action will download the la
 - name: Setup pscale
   uses: planetscale/setup-pscale-action@v1
   with:
-    version: v0.147.0
+    version: v0.245.0
 ```
+
+## Examples
+See our [PlanetScale + GitHub Actions doc](https://planetscale.com/docs/devops/github-actions) for ideas on how to use `pscale` in your Actions Workflows.
 
 ## Development
 
